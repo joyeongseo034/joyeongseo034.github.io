@@ -1,19 +1,201 @@
-<button id="startBtn">카메라 켜기</button>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>인생네컷 2x2 + Firebase + QR</title>
+<style>
+body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;flex-direction:column;align-items:center;padding:16px}
+video{width:100%;max-width:400px;border-radius:12px;background:#000}
+canvas{display:block;width:100%;max-width:400px;margin:12px 0;border-radius:12px;background:#fff}
+.controls,.thumbs,.selects,.qr-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{padding:8px 12px;border:0;border-radius:8px;font-size:16px}
+button.primary{background:#ffd166;color:#111;font-weight:600}
+.thumbs img,.selects img{width:70px;height:70px;object-fit:cover;border:2px solid transparent;border-radius:6px;cursor:pointer}
+.selected{border-color:#ffd166}
+#qrcodeCanvas{background:#fff;padding:4px;border-radius:6px}
+</style>
+</head>
+<body>
+
+<h2>인생네컷 2x2 + Firebase + QR</h2>
+
 <video id="video" autoplay playsinline muted></video>
-<script>
+<div class="controls">
+  <button id="startBtn" class="primary">카메라 시작</button>
+  <button id="switchBtn">카메라 전환</button>
+  <button id="snapBtn">사진 찍기</button>
+</div>
+
+<h3>찍은 사진 (최대 6장)</h3>
+<div class="thumbs" id="thumbs"></div>
+
+<h3>선택한 4장</h3>
+<div class="selects" id="selects"></div>
+<button id="makeStrip" class="primary">스트립 만들기</button>
+
+<canvas id="strip" style="display:none"></canvas>
+
+<div class="qr-wrap" style="margin-top:12px">
+  <button id="qrBtn">QR 생성</button>
+  <canvas id="qrcodeCanvas"></canvas>
+</div>
+
+<button id="downloadBtn" class="primary" style="margin-top:12px;display:none">다운로드</button>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
+import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js";
+
+// Firebase 설정
+const firebaseConfig = {
+  apiKey: "AIzaSyAbtYXrRGh2ncLrIdePePDsEdRknn3iHuo",
+  authDomain: "photobooth-93cef.firebaseapp.com",
+  projectId: "photobooth-93cef",
+  storageBucket: "photobooth-93cef.appspot.com",
+  messagingSenderId: "758521835109",
+  appId: "1:758521835109:web:c42e1a3ef68b5e6529a08c"
+};
+const app = initializeApp(firebaseConfig);
+const storage = getStorage(app);
+
 const video = document.getElementById('video');
 const startBtn = document.getElementById('startBtn');
+const switchBtn = document.getElementById('switchBtn');
+const snapBtn = document.getElementById('snapBtn');
+const thumbs = document.getElementById('thumbs');
+const selects = document.getElementById('selects');
+const makeStrip = document.getElementById('makeStrip');
+const strip = document.getElementById('strip');
+const qrBtn = document.getElementById('qrBtn');
+const qrCanvas = document.getElementById('qrcodeCanvas');
+const downloadBtn = document.getElementById('downloadBtn');
 
+let stream = null;
+let facingMode = 'user';
+let shots = [];
+let selected = [];
+
+// 카메라 시작
 async function startCamera(){
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  try{
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
     video.srcObject = stream;
     await video.play();
-  } catch(e) {
+  }catch(e){
     alert("카메라 접근 실패: "+e.message);
     console.error(e);
   }
 }
 
-startBtn.addEventListener('click', startCamera);
+// 버튼 클릭으로 카메라 시작
+startBtn.addEventListener('click', async ()=>{
+  await startCamera();
+  startBtn.style.display='none';
+});
+
+// 카메라 전환
+switchBtn.addEventListener('click', async ()=>{
+  facingMode = (facingMode==='user')?'environment':'user';
+  await startCamera();
+});
+
+// 사진 찍기
+snapBtn.addEventListener('click', ()=>{
+  if(shots.length>=6){alert("최대 6장까지 찍을 수 있어요");return;}
+  if(video.readyState<2){alert("카메라 준비 중입니다.");return;}
+  const c = document.createElement('canvas');
+  const side = Math.min(video.videoWidth, video.videoHeight);
+  c.width = c.height = side;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(video, (video.videoWidth-side)/2, (video.videoHeight-side)/2, side, side, 0, 0, side, side);
+  const dataUrl = c.toDataURL('image/png');
+  shots.push(dataUrl);
+
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  thumbs.appendChild(img);
+  img.addEventListener('click', ()=> selectPhoto(dataUrl, img));
+});
+
+// 사진 선택
+function selectPhoto(dataUrl, imgEl){
+  if(selected.includes(dataUrl)){
+    selected = selected.filter(d=>d!==dataUrl);
+    imgEl.classList.remove('selected');
+  } else {
+    if(selected.length>=4){alert("4장만 선택할 수 있어요"); return;}
+    selected.push(dataUrl);
+    imgEl.classList.add('selected');
+  }
+  renderSelected();
+}
+function renderSelected(){
+  selects.innerHTML='';
+  selected.forEach(url=>{
+    const im=document.createElement('img'); im.src=url; selects.appendChild(im);
+  });
+}
+
+// 2x2 스트립 생성
+makeStrip.addEventListener('click', async ()=>{
+  if(selected.length!==4){alert("4장을 선택하세요");return;}
+  const side=200, gap=10;
+  strip.width = side*2 + gap;
+  strip.height = side*2 + gap;
+  const ctx = strip.getContext('2d');
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,0,strip.width,strip.height);
+
+  for(let i=0;i<4;i++){
+    await new Promise(resolve=>{
+      const img=new Image();
+      img.src=selected[i];
+      img.onload = ()=>{
+        const x = (i%2)*(side+gap);
+        const y = Math.floor(i/2)*(side+gap);
+        ctx.drawImage(img,x,y,side,side);
+        resolve();
+      }
+    });
+  }
+  strip.style.display='block';
+  downloadBtn.style.display='block';
+});
+
+// Blob 변환
+function dataURLtoBlob(dataurl){
+  const arr=dataurl.split(','), mime=arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n=bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){u8arr[n]=bstr.charCodeAt(n);}
+  return new Blob([u8arr], {type:mime});
+}
+
+// Firebase 업로드
+async function uploadImage(blob, filename="photobooth.png"){
+  const fileRef = ref(storage, `photobooth/${Date.now()}_${filename}`);
+  await uploadBytes(fileRef, blob);
+  return await getDownloadURL(fileRef);
+}
+
+// QR 생성
+qrBtn.addEventListener('click', async ()=>{
+  const blob = dataURLtoBlob(strip.toDataURL("image/png"));
+  const url = await uploadImage(blob);
+  QRCode.toCanvas(qrCanvas, url, {width:200}, err=>{if(err)console.error(err)});
+});
+
+// 다운로드
+downloadBtn.addEventListener('click', ()=>{
+  const a = document.createElement('a');
+  a.href = strip.toDataURL("image/png");
+  a.download = "photobooth.png";
+  a.click();
+});
 </script>
+</body>
+</html>
