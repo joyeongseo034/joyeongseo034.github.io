@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>인생네컷 2x2 + Firebase 업로드 + QR</title>
+<title>인생네컷 2x2 + Firebase + QR</title>
 <style>
 body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;flex-direction:column;align-items:center;padding:16px}
 video{width:100%;max-width:400px;border-radius:12px;background:#000}
@@ -18,7 +18,7 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 </head>
 <body>
 
-<h2>인생네컷 2x2 + Firebase 업로드 + QR</h2>
+<h2>인생네컷 2x2 + Firebase + QR</h2>
 
 <video id="video" autoplay playsinline muted></video>
 <div class="controls">
@@ -42,12 +42,13 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 
 <button id="downloadBtn" class="primary" style="margin-top:12px;display:none">다운로드</button>
 
-<!-- Firebase SDK -->
+<!-- Firebase + QRCode SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js";
 
+// Firebase 설정
 const firebaseConfig = {
   apiKey: "AIzaSyAbtYXrRGh2ncLrIdePePDsEdRknn3iHuo",
   authDomain: "photobooth-93cef.firebaseapp.com",
@@ -56,7 +57,6 @@ const firebaseConfig = {
   messagingSenderId: "758521835109",
   appId: "1:758521835109:web:c42e1a3ef68b5e6529a08c"
 };
-
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
@@ -78,14 +78,18 @@ let selected=[];
 
 // 카메라 시작
 async function startCamera(){
-  if(stream) stream.getTracks().forEach(t=>t.stop());
   try{
+    if(stream) stream.getTracks().forEach(t=>t.stop());
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facingMode}});
     video.srcObject=stream;
+    await video.play(); // iOS Safari용
   }catch(e){
-    alert('카메라 접근 실패: '+e.message);
+    console.error("카메라 접근 실패:",e);
+    alert("카메라 접근 실패: "+e.message);
   }
 }
+
+// 카메라 전환
 switchBtn.addEventListener('click',async()=>{
   facingMode=facingMode==='user'?'environment':'user';
   await startCamera();
@@ -188,7 +192,10 @@ downloadBtn.addEventListener('click',()=>{
   a.click();
 });
 
-await startCamera();
+// DOM 로드 후 카메라 시작
+document.addEventListener('DOMContentLoaded',async()=>{
+  await startCamera();
+});
 </script>
 </body>
 </html>
