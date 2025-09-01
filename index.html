@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>iOS 안전 인생네컷</title>
+<title>인생네컷 2x2 + QR</title>
 <style>
 body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:16px}
 video{width:100%;max-width:400px;border-radius:12px;background:#000}
@@ -18,7 +18,7 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 </head>
 <body>
 
-<h2>iOS 안전 인생네컷</h2>
+<h2>인생네컷 2x2 + QR</h2>
 <video id="video" autoplay playsinline muted></video>
 <div class="controls">
   <button id="switchBtn">카메라 전환</button>
@@ -30,7 +30,7 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 
 <h3>선택한 4장</h3>
 <div class="selects" id="selects"></div>
-<button id="makeStrip" class="primary" style="margin-top:8px">네컷 만들기</button>
+<button id="makeStrip" class="primary" style="margin-top:8px">스트립 만들기</button>
 
 <canvas id="strip" style="display:none"></canvas>
 
@@ -112,31 +112,49 @@ function renderSelected(){
   });
 }
 
-// 네컷 만들기 (Promise로 순서 보장)
+// 2x2 스트립 만들기
 makeStrip.addEventListener('click',async()=>{
   if(selected.length!==4){alert("4장을 선택하세요");return;}
-  const side=400;
-  strip.width=side;
-  strip.height=side*4+10*3;
-  const ctx=strip.getContext('2d');
+  const side=200; // 각 사진 크기
+  const gap=10;
+  strip.width = side*2 + gap;
+  strip.height = side*2 + gap;
+  const ctx = strip.getContext('2d');
   ctx.fillStyle='#fff';
   ctx.fillRect(0,0,strip.width,strip.height);
 
-  for(let i=0;i<selected.length;i++){
+  for(let i=0;i<4;i++){
     await new Promise(resolve=>{
       const img=new Image();
       img.src=selected[i];
-      img.onload=()=>{ctx.drawImage(img,0,i*(side+10),side,side);resolve();}
+      img.onload=()=>{ 
+        const x=(i%2)*(side+gap);
+        const y=Math.floor(i/2)*(side+gap);
+        ctx.drawImage(img,x,y,side,side);
+        resolve(); 
+      }
     });
   }
   strip.style.display='block';
   downloadBtn.style.display='block';
 });
 
+// DataURL → Blob
+function dataURLtoBlob(dataurl) {
+  const arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+  return new Blob([u8arr], {type:mime});
+}
+
 // QR 코드 생성
 qrBtn.addEventListener('click',()=>{
   const dataUrl=strip.toDataURL("image/png");
-  QRCode.toCanvas(qrCanvas,dataUrl,{width:200},err=>{if(err)console.error(err)});
+  const blob=dataURLtoBlob(dataUrl);
+  const url=URL.createObjectURL(blob);
+  QRCode.toCanvas(qrCanvas,url,{width:200},err=>{if(err)console.error(err)});
 });
 
 // 다운로드
