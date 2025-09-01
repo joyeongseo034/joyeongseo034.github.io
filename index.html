@@ -48,7 +48,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebas
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js";
 
-// Firebase 설정
+// Firebase 설정 (당신 제공값 그대로)
 const firebaseConfig = {
   apiKey: "AIzaSyAbtYXrRGh2ncLrIdePePDsEdRknn3iHuo",
   authDomain: "photobooth-93cef.firebaseapp.com",
@@ -83,7 +83,7 @@ async function startCamera(){
     if(stream) stream.getTracks().forEach(t=>t.stop());
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facingMode}});
     video.srcObject=stream;
-    await video.play(); // iOS Safari용
+    await video.play();
   }catch(e){
     console.error("카메라 접근 실패:",e);
     alert("카메라 접근 실패: "+e.message);
@@ -93,7 +93,7 @@ async function startCamera(){
 // 버튼 클릭으로 권한 요청
 startBtn.addEventListener('click', async ()=>{
   await startCamera();
-  startBtn.style.display='none'; // 버튼 숨김
+  startBtn.style.display='none';
 });
 
 // 카메라 전환
