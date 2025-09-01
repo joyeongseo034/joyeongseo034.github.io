@@ -22,8 +22,9 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 
 <video id="video" autoplay playsinline muted></video>
 <div class="controls">
+  <button id="startBtn" class="primary">촬영 시작</button>
   <button id="switchBtn">카메라 전환</button>
-  <button id="snapBtn" class="primary">촬영</button>
+  <button id="snapBtn">사진 찍기</button>
 </div>
 
 <h3>찍은 사진 (최대 6장)</h3>
@@ -31,7 +32,7 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 
 <h3>선택한 4장</h3>
 <div class="selects" id="selects"></div>
-<button id="makeStrip" class="primary" style="margin-top:8px">스트립 만들기</button>
+<button id="makeStrip" class="primary">스트립 만들기</button>
 
 <canvas id="strip" style="display:none"></canvas>
 
@@ -42,7 +43,6 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 
 <button id="downloadBtn" class="primary" style="margin-top:12px;display:none">다운로드</button>
 
-<!-- Firebase + QRCode SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
@@ -61,6 +61,7 @@ const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
 const video=document.getElementById('video');
+const startBtn=document.getElementById('startBtn');
 const switchBtn=document.getElementById('switchBtn');
 const snapBtn=document.getElementById('snapBtn');
 const thumbs=document.getElementById('thumbs');
@@ -73,10 +74,10 @@ const downloadBtn=document.getElementById('downloadBtn');
 
 let stream=null;
 let facingMode='user';
-let shots=[]; // 최대 6장
+let shots=[];
 let selected=[];
 
-// 카메라 시작
+// 카메라 시작 (버튼 클릭)
 async function startCamera(){
   try{
     if(stream) stream.getTracks().forEach(t=>t.stop());
@@ -89,14 +90,20 @@ async function startCamera(){
   }
 }
 
+// 버튼 클릭으로 권한 요청
+startBtn.addEventListener('click', async ()=>{
+  await startCamera();
+  startBtn.style.display='none'; // 버튼 숨김
+});
+
 // 카메라 전환
-switchBtn.addEventListener('click',async()=>{
+switchBtn.addEventListener('click', async ()=>{
   facingMode=facingMode==='user'?'environment':'user';
   await startCamera();
 });
 
-// 촬영
-snapBtn.addEventListener('click',()=>{
+// 사진 촬영
+snapBtn.addEventListener('click', ()=>{
   if(shots.length>=6){alert("최대 6장까지 찍을 수 있어요");return;}
   if(video.readyState<2){alert("카메라 준비 중입니다.");return;}
   const c=document.createElement('canvas');
@@ -133,7 +140,7 @@ function renderSelected(){
 }
 
 // 2x2 스트립 만들기
-makeStrip.addEventListener('click',async()=>{
+makeStrip.addEventListener('click', async ()=>{
   if(selected.length!==4){alert("4장을 선택하세요");return;}
   const side=200;
   const gap=10;
@@ -147,11 +154,11 @@ makeStrip.addEventListener('click',async()=>{
     await new Promise(resolve=>{
       const img=new Image();
       img.src=selected[i];
-      img.onload=()=>{ 
+      img.onload=()=>{
         const x=(i%2)*(side+gap);
         const y=Math.floor(i/2)*(side+gap);
         ctx.drawImage(img,x,y,side,side);
-        resolve(); 
+        resolve();
       }
     });
   }
@@ -160,13 +167,13 @@ makeStrip.addEventListener('click',async()=>{
 });
 
 // Blob 변환
-function dataURLtoBlob(dataurl) {
-  const arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1];
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
-  return new Blob([u8arr], {type:mime});
+function dataURLtoBlob(dataurl){
+  const arr=dataurl.split(','), mime=arr[0].match(/:(.*?);/)[1];
+  const bstr=atob(arr[1]);
+  let n=bstr.length;
+  const u8arr=new Uint8Array(n);
+  while(n--){u8arr[n]=bstr.charCodeAt(n);}
+  return new Blob([u8arr],{type:mime});
 }
 
 // 업로드
@@ -177,24 +184,19 @@ async function uploadImage(blob, filename="photobooth.png"){
   return url;
 }
 
-// QR 코드 생성
-qrBtn.addEventListener('click',async()=>{
+// QR 생성
+qrBtn.addEventListener('click', async ()=>{
   const blob = dataURLtoBlob(strip.toDataURL("image/png"));
   const url = await uploadImage(blob);
   QRCode.toCanvas(qrCanvas, url, {width:200}, err=>{if(err)console.error(err)});
 });
 
 // 다운로드
-downloadBtn.addEventListener('click',()=>{
+downloadBtn.addEventListener('click', ()=>{
   const a=document.createElement('a');
   a.href=strip.toDataURL("image/png");
   a.download="photobooth.png";
   a.click();
-});
-
-// DOM 로드 후 카메라 시작
-document.addEventListener('DOMContentLoaded',async()=>{
-  await startCamera();
 });
 </script>
 </body>
