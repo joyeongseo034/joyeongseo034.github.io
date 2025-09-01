@@ -9,11 +9,12 @@ body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;fle
 video{width:100%;max-width:400px;border-radius:12px;background:#000}
 canvas{display:block;width:100%;max-width:400px;margin:12px 0;border-radius:12px;background:#fff}
 .controls,.thumbs,.selects,.qr-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-button{padding:8px 12px;border:0;border-radius:8px;font-size:16px}
+button{padding:8px 12px;border:0;border-radius:8px;font-size:16px;cursor:pointer}
 button.primary{background:#ffd166;color:#111;font-weight:600}
 .thumbs img,.selects img{width:70px;height:70px;object-fit:cover;border:2px solid transparent;border-radius:6px;cursor:pointer}
 .selected{border-color:#ffd166}
 #qrcodeCanvas{background:#fff;padding:4px;border-radius:6px}
+#fallbackBtn{display:none;background:#06d6a0;color:#111;font-weight:600}
 </style>
 </head>
 <body>
@@ -22,10 +23,12 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 
 <video id="video" autoplay playsinline muted></video>
 <div class="controls">
-  <button id="startBtn" class="primary">카메라 시작</button>
   <button id="switchBtn">카메라 전환</button>
-  <button id="snapBtn">사진 찍기</button>
+  <button id="snapBtn" class="primary">사진 찍기</button>
 </div>
+
+<!-- iOS Safari fallback 버튼 -->
+<button id="fallbackBtn">📸 카메라 켜기 (Safari)</button>
 
 <h3>찍은 사진 (최대 6장)</h3>
 <div class="thumbs" id="thumbs"></div>
@@ -61,9 +64,9 @@ const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
 const video = document.getElementById('video');
-const startBtn = document.getElementById('startBtn');
 const switchBtn = document.getElementById('switchBtn');
 const snapBtn = document.getElementById('snapBtn');
+const fallbackBtn = document.getElementById('fallbackBtn');
 const thumbs = document.getElementById('thumbs');
 const selects = document.getElementById('selects');
 const makeStrip = document.getElementById('makeStrip');
@@ -77,23 +80,33 @@ let facingMode = 'user';
 let shots = [];
 let selected = [];
 
-// iOS Safari 안전 카메라 시작
+// 카메라 시작
 async function startCamera() {
   try {
-    if(stream) stream.getTracks().forEach(t => t.stop());
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    const constraints = { video: { facingMode } };
+
+    stream = await navigator.mediaDevices.getUserMedia(constraints)
+      .catch(async () => await navigator.mediaDevices.getUserMedia({ video: true }));
+
     video.srcObject = stream;
-    await video.play(); // 권한 요청 & 재생 보장
-  } catch(e) {
-    alert("카메라 접근 실패: "+e.message);
-    console.error(e);
+    await video.play();
+    console.log("✅ 카메라 시작됨");
+  } catch (e) {
+    console.warn("⚠️ 자동 카메라 시작 실패 (아마 iOS Safari일 수 있음):", e.message);
+    fallbackBtn.style.display = "block"; // 버튼 표시
   }
 }
 
-// 버튼 클릭으로 시작
-startBtn.addEventListener('click', async ()=>{ 
-  await startCamera(); 
-  startBtn.style.display='none'; 
+// iOS Safari fallback 버튼
+fallbackBtn.addEventListener("click", async () => {
+  fallbackBtn.style.display = "none";
+  await startCamera();
+});
+
+// 페이지 로드시 자동 실행 시도
+document.addEventListener("DOMContentLoaded", () => {
+  startCamera();
 });
 
 // 카메라 전환
@@ -102,16 +115,16 @@ switchBtn.addEventListener('click', async ()=>{
   await startCamera(); 
 });
 
-// 사진 찍기 (iOS 안전)
+// 사진 찍기
 snapBtn.addEventListener('click', ()=>{
   if(shots.length>=6){alert("최대 6장"); return;}
   if(video.readyState<2){alert("카메라 준비 중"); return;}
 
   const c = document.createElement('canvas');
-  c.width = video.videoWidth || 640; // fallback
+  c.width = video.videoWidth || 640;
   c.height = video.videoHeight || 480;
   const ctx = c.getContext('2d');
-  ctx.drawImage(video, 0, 0, c.width, c.height); // 전체 영상 캡처
+  ctx.drawImage(video, 0, 0, c.width, c.height);
   const dataUrl = c.toDataURL('image/png');
 
   shots.push(dataUrl);
@@ -180,7 +193,7 @@ async function uploadImage(blob, filename="photobooth.png"){
   return await getDownloadURL(fileRef);
 }
 
-// QR 생성 (Firebase URL)
+// QR 생성
 qrBtn.addEventListener('click', async ()=>{
   const blob = dataURLtoBlob(strip.toDataURL("image/png"));
   const url = await uploadImage(blob);
