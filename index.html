@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>아이폰 포토부스</title>
+<style>
+  body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh}
+  .wrap{max-width:420px;width:100%;padding:16px}
+  video{width:100%;border-radius:12px;background:#000}
+  .controls{margin-top:12px;display:flex;gap:8px}
+  button{flex:1;padding:10px;border:0;border-radius:8px;font-size:16px}
+  button.primary{background:#ffd166;color:#111;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <div class="controls">
+    <button id="switchBtn">카메라 전환</button>
+    <button id="startBtn" class="primary">촬영 시작</button>
+  </div>
+  <p id="status">카메라 장치 로딩 중...</p>
+</div>
+
+<script>
+(async () => {
+  const video = document.getElementById('video');
+  const statusEl = document.getElementById('status');
+  const switchBtn = document.getElementById('switchBtn');
+  let stream = null;
+  let facingMode = 'user'; // 기본 전면카메라
+
+  async function startCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: facingMode } }
+      });
+      video.srcObject = stream;
+      statusEl.textContent = '카메라 연결됨 ('+facingMode+')';
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = '카메라 접근 실패: ' + e.message;
+    }
+  }
+
+  switchBtn.addEventListener('click', async () => {
+    facingMode = (facingMode === 'user') ? 'environment' : 'user';
+    await startCamera();
+  });
+
+  await startCamera();
+})();
+</script>
+</body>
+</html>
