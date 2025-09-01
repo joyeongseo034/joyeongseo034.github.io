@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>인생네컷 2x2 + Firebase + QR</title>
+<title>인생네컷 2x2 + QR</title>
 <style>
 body{margin:0;font-family:sans-serif;background:#111;color:#fff;display:flex;flex-direction:column;align-items:center;padding:16px}
 video{width:100%;max-width:400px;border-radius:12px;background:#000}
@@ -18,7 +18,7 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 </head>
 <body>
 
-<h2>인생네컷 2x2 + Firebase + QR</h2>
+<h2>인생네컷 2x2 + QR (Firebase 없이)</h2>
 
 <video id="video" autoplay playsinline muted></video>
 <div class="controls">
@@ -44,21 +44,7 @@ button.primary{background:#ffd166;color:#111;font-weight:600}
 <button id="downloadBtn" class="primary" style="margin-top:12px;display:none">다운로드</button>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 import QRCode from "https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js";
-
-// Firebase 설정
-const firebaseConfig = {
-  apiKey: "AIzaSyAbtYXrRGh2ncLrIdePePDsEdRknn3iHuo",
-  authDomain: "photobooth-93cef.firebaseapp.com",
-  projectId: "photobooth-93cef",
-  storageBucket: "photobooth-93cef.appspot.com",
-  messagingSenderId: "758521835109",
-  appId: "1:758521835109:web:c42e1a3ef68b5e6529a08c"
-};
-const app = initializeApp(firebaseConfig);
-const storage = getStorage(app);
 
 const video = document.getElementById('video');
 const startBtn = document.getElementById('startBtn');
@@ -90,19 +76,9 @@ async function startCamera(){
   }
 }
 
-// 버튼 클릭으로 카메라 시작
-startBtn.addEventListener('click', async ()=>{
-  await startCamera();
-  startBtn.style.display='none';
-});
+startBtn.addEventListener('click', async ()=>{ await startCamera(); startBtn.style.display='none'; });
+switchBtn.addEventListener('click', async ()=>{ facingMode = facingMode==='user'?'environment':'user'; await startCamera(); });
 
-// 카메라 전환
-switchBtn.addEventListener('click', async ()=>{
-  facingMode = (facingMode==='user')?'environment':'user';
-  await startCamera();
-});
-
-// 사진 찍기
 snapBtn.addEventListener('click', ()=>{
   if(shots.length>=6){alert("최대 6장까지 찍을 수 있어요");return;}
   if(video.readyState<2){alert("카메라 준비 중입니다.");return;}
@@ -120,7 +96,6 @@ snapBtn.addEventListener('click', ()=>{
   img.addEventListener('click', ()=> selectPhoto(dataUrl, img));
 });
 
-// 사진 선택
 function selectPhoto(dataUrl, imgEl){
   if(selected.includes(dataUrl)){
     selected = selected.filter(d=>d!==dataUrl);
@@ -134,28 +109,25 @@ function selectPhoto(dataUrl, imgEl){
 }
 function renderSelected(){
   selects.innerHTML='';
-  selected.forEach(url=>{
-    const im=document.createElement('img'); im.src=url; selects.appendChild(im);
-  });
+  selected.forEach(url=>{ const im=document.createElement('img'); im.src=url; selects.appendChild(im); });
 }
 
-// 2x2 스트립 생성
+// 2x2 스트립
 makeStrip.addEventListener('click', async ()=>{
   if(selected.length!==4){alert("4장을 선택하세요");return;}
   const side=200, gap=10;
   strip.width = side*2 + gap;
   strip.height = side*2 + gap;
   const ctx = strip.getContext('2d');
-  ctx.fillStyle='#fff';
-  ctx.fillRect(0,0,strip.width,strip.height);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,strip.width,strip.height);
 
   for(let i=0;i<4;i++){
     await new Promise(resolve=>{
       const img=new Image();
       img.src=selected[i];
       img.onload = ()=>{
-        const x = (i%2)*(side+gap);
-        const y = Math.floor(i/2)*(side+gap);
+        const x=(i%2)*(side+gap);
+        const y=Math.floor(i/2)*(side+gap);
         ctx.drawImage(img,x,y,side,side);
         resolve();
       }
@@ -175,17 +147,10 @@ function dataURLtoBlob(dataurl){
   return new Blob([u8arr], {type:mime});
 }
 
-// Firebase 업로드
-async function uploadImage(blob, filename="photobooth.png"){
-  const fileRef = ref(storage, `photobooth/${Date.now()}_${filename}`);
-  await uploadBytes(fileRef, blob);
-  return await getDownloadURL(fileRef);
-}
-
-// QR 생성
+// QR 생성 (로컬 Blob URL 사용)
 qrBtn.addEventListener('click', async ()=>{
   const blob = dataURLtoBlob(strip.toDataURL("image/png"));
-  const url = await uploadImage(blob);
+  const url = URL.createObjectURL(blob); // 로컬에서 바로 QR 생성
   QRCode.toCanvas(qrCanvas, url, {width:200}, err=>{if(err)console.error(err)});
 });
 
